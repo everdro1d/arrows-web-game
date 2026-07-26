@@ -12,13 +12,13 @@ const CONFIG = {
   COLOR_RAY: '#D0E8F0',
   BLOCKED_SHAKE_MS: 260,
   BLOCKED_FLASH_MS: 340,
-  FIRE_SPEED_CELLS_PER_SEC: 10,
+  FIRE_SPEED_CELLS_PER_SEC: 15,
   DIFFICULTIES: {
     simple: { name: 'Simple', size: 6, arrowCount: 8 },
     easy: { name: 'Easy', size: 10, arrowCount: 20 },
     medium: { name: 'Medium', size: 15, arrowCount: 50 },
     hard: { name: 'Hard', size: 35, arrowCount: 140 },
-    superHard: { name: 'Super Hard', size: 60, arrowCount: 355 },
+    superHard: { name: 'Super Hard', size: 60, arrowCount: 320 },
     legendary: { name: 'Legendary', size: 100, arrowCount: 1200 }
   }
 };
@@ -122,6 +122,11 @@ function generateBoard(difficultyKey) {
       Array.from({ length: size }, () => [])
     );
 
+    const dirCounts = {};
+    for (const dk of DIR_KEYS) {
+      dirCounts[dk] = 0;
+    }
+
     while (arrowId <= diff.arrowCount && emptyCount > 0) {
       const emptyCells = [];
       for (let y = 0; y < size; y += 1) {
@@ -136,13 +141,44 @@ function generateBoard(difficultyKey) {
       emptyCells.sort((a, b) => {
         const distA = Math.max(Math.abs(a.x - center), Math.abs(a.y - center));
         const distB = Math.max(Math.abs(b.x - center), Math.abs(b.y - center));
-        if (distA !== distB) return distA - distB;
-        return a.r - b.r;
+
+        const jitterA = distA + (a.r * 16.0);
+        const jitterB = distB + (b.r * 16.0);
+
+        return jitterA - jitterB;
       });
 
       let placement = null;
       for (const head of emptyCells) {
-        const dirs = shuffle([...DIR_KEYS]);
+
+        // const localCounts = {};
+        // for (const dk of DIR_KEYS) {
+        //   localCounts[dk] = 0;
+        // }
+        //
+        // const bounds = 3;
+        // for (let dy = -bounds; dy <= bounds; dy += 1) {
+        //   for (let dx = -bounds; dx <= bounds; dx += 1) {
+        //     const nx = head.x + dx;
+        //     const ny = head.y + dy;
+        //
+        //     if (inBounds(nx, ny, size) && grid[ny][nx] !== null) {
+        //       const arr = arrows.get(grid[ny][nx]);
+        //       if (arr) {
+        //         localCounts[arr.headDir] += 1;
+        //       }
+        //     }
+        //   }
+        // }
+
+        const dirs = shuffle([...DIR_KEYS]).sort((a, b) => dirCounts[a] - dirCounts[b]);
+        // tolerance
+        // const dirs = shuffle([...DIR_KEYS]).sort((a, b) => {
+        //   if (Math.abs(dirCounts[a] - dirCounts[b]) > 2) {
+        //     return dirCounts[a] - dirCounts[b];
+        //   }
+        //   return 0;
+        // });
 
         for (const dirKey of dirs) {
           const dir = DIRS[dirKey];
@@ -181,6 +217,8 @@ function generateBoard(difficultyKey) {
         failed = true;
         break;
       }
+
+      dirCounts[placement.dirKey] += 1;
 
       const cells = [placement.head, placement.body1];
       grid[placement.head.y][placement.head.x] = arrowId;
@@ -235,15 +273,21 @@ function generateBoard(difficultyKey) {
         bestNeighbors.sort((a, b) => {
             const distA = Math.max(Math.abs(a.x - center), Math.abs(a.y - center));
             const distB = Math.max(Math.abs(b.x - center), Math.abs(b.y - center));
-            return distA - distB;
+
+            const jitterA = distA + (Math.random() * 0.5);
+            const jitterB = distB + (Math.random() * 0.5);
+
+            return jitterA - jitterB;
         });
 
-        const closestDist = Math.max(Math.abs(bestNeighbors[0].x - center), Math.abs(bestNeighbors[0].y - center));
-        const closestNeighbors = bestNeighbors.filter((n) =>
-            Math.max(Math.abs(n.x - center), Math.abs(n.y - center)) === closestDist
-        );
+        const next = bestNeighbors[0];
 
-        const next = closestNeighbors[randInt(closestNeighbors.length)];
+        // const closestDist = Math.max(Math.abs(bestNeighbors[0].x - center), Math.abs(bestNeighbors[0].y - center));
+        // const closestNeighbors = bestNeighbors.filter((n) =>
+        //     Math.max(Math.abs(n.x - center), Math.abs(n.y - center)) === closestDist
+        // );
+        //
+        // const next = closestNeighbors[randInt(closestNeighbors.length)];
         cells.push(next);
         grid[next.y][next.x] = arrowId;
         emptyCount -= 1;
