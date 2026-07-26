@@ -52,6 +52,10 @@ body {
   padding: 8px 10px;
   background: #fff;
   color: #000;
+  font-size: 16px;
+}
+
+.small-text {
   font-size: 14px;
 }
 
