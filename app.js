@@ -152,27 +152,33 @@ function generateBoard(difficultyKey) {
       let placement = null;
       for (const head of emptyCells) {
 
-        // const localCounts = {};
-        // for (const dk of DIR_KEYS) {
-        //   localCounts[dk] = 0;
-        // }
-        //
-        // const bounds = 3;
-        // for (let dy = -bounds; dy <= bounds; dy += 1) {
-        //   for (let dx = -bounds; dx <= bounds; dx += 1) {
-        //     const nx = head.x + dx;
-        //     const ny = head.y + dy;
-        //
-        //     if (inBounds(nx, ny, size) && grid[ny][nx] !== null) {
-        //       const arr = arrows.get(grid[ny][nx]);
-        //       if (arr) {
-        //         localCounts[arr.headDir] += 1;
-        //       }
-        //     }
-        //   }
-        // }
+        const localCounts = {};
+        for (const dk of DIR_KEYS) {
+          localCounts[dk] = 0;
+        }
 
-        const dirs = shuffle([...DIR_KEYS]).sort((a, b) => dirCounts[a] - dirCounts[b]);
+        const bounds = 4;
+        for (let dy = -bounds; dy <= bounds; dy += 1) {
+          for (let dx = -bounds; dx <= bounds; dx += 1) {
+            const nx = head.x + dx;
+            const ny = head.y + dy;
+
+            if (inBounds(nx, ny, size) && grid[ny][nx] !== null) {
+              const arr = arrows.get(grid[ny][nx]);
+              if (arr) {
+                localCounts[arr.headDir] += 1;
+              }
+            }
+          }
+        }
+
+        // const dirs = shuffle([...DIR_KEYS]).sort((a, b) => dirCounts[a] - dirCounts[b]);
+        const dirs = shuffle([...DIR_KEYS]).sort((a, b) => {
+          if ((localCounts[a] !== localCounts[b]) && (Math.abs(localCounts[a] - localCounts[b]) > 2)) {
+            return localCounts[a] - localCounts[b];
+          }
+          return dirCounts[a] - dirCounts[b];
+        });
         // tolerance
         // const dirs = shuffle([...DIR_KEYS]).sort((a, b) => {
         //   if (Math.abs(dirCounts[a] - dirCounts[b]) > 2) {
