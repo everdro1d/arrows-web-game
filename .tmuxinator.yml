@@ -1,0 +1,9 @@
+name: arrows-web-game
+root: /home/everdro1d/project/arrows-web-game
+#pre_window: nix develop
+startup_window: editor
+windows:
+  - editor:
+      - nvim .
+  - term:
+  - git-lg: lazygit
