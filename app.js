@@ -142,8 +142,9 @@ function generateBoard(difficultyKey) {
         const distA = Math.max(Math.abs(a.x - center), Math.abs(a.y - center));
         const distB = Math.max(Math.abs(b.x - center), Math.abs(b.y - center));
 
-        const jitterA = distA + (a.r * 16.0);
-        const jitterB = distB + (b.r * 16.0);
+        const tailJitter = 1.0;
+        const jitterA = distA + (a.r * tailJitter);
+        const jitterB = distB + (b.r * tailJitter);
 
         return jitterA - jitterB;
       });
@@ -296,10 +297,9 @@ function generateBoard(difficultyKey) {
             const distA = Math.max(Math.abs(a.x - center), Math.abs(a.y - center));
             const distB = Math.max(Math.abs(b.x - center), Math.abs(b.y - center));
 
-            // 2.0 jitter allows the tail to step outward slightly to complete a coil
-            // before snapping back toward the center.
-            const jitterA = distA + (Math.random() * 2.0);
-            const jitterB = distB + (Math.random() * 2.0);
+            const jitter = 2.0;
+            const jitterA = distA + (Math.random() * jitter);
+            const jitterB = distB + (Math.random() * jitter);
 
             return jitterA - jitterB;
         });
@@ -442,7 +442,7 @@ function generateBoard(difficultyKey) {
         }
       }
 
-      if (clearRayCount > arrows.size / 3) {
+      if (clearRayCount > arrows.size / 2) {
         continue; // Reject this board layout and try again
       }
     }
