@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Arrow Uncoiling Puzzle</title>
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="ui-root">
+      <button id="menu-button" class="ui-button" aria-label="Open menu">☰</button>
+      <button id="rays-toggle" class="ui-button">Rays: Off</button>
+      <div id="timer" class="pill">00:00.0</div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="difficulty-modal" class="modal visible" role="dialog" aria-modal="true">
+      <div class="modal-content">
+        <h1>Arrow Uncoiling</h1>
+        <p>Select difficulty</p>
+        <div class="button-grid">
+          <button data-difficulty="easy">Easy</button>
+          <button data-difficulty="medium">Medium</button>
+          <button data-difficulty="hard">Hard</button>
+          <button data-difficulty="superHard">Super Hard</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="menu-modal" class="modal" role="dialog" aria-modal="true">
+      <div class="modal-content">
+        <button id="menu-close" class="close-button" aria-label="Close menu">✕</button>
+        <h2>Menu</h2>
+        <div class="button-grid single">
+          <button id="restart-level">Restart Current Level</button>
+          <button id="return-select">Return to Difficulty Select</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="win-modal" class="modal" role="dialog" aria-modal="true">
+      <div class="modal-content">
+        <h2 id="win-title">Legendary!</h2>
+        <p id="win-time"></p>
+        <p id="win-count"></p>
+        <div class="button-grid single">
+          <button id="new-level">New Generated Level</button>
+          <button id="main-menu">Main Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
