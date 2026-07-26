@@ -250,10 +250,12 @@ function generateBoard(difficultyKey) {
         if (neighbors.length === 0) break;
 
         let bestNeighbors = [];
-        let minEmptyNeighbors = 999;
+        let bestScore = -999;
 
         for (const n of neighbors) {
           let emptyNeighborsCount = 0;
+
+          // 1. Calculate open space to avoid leaving 1-cell unfillable gaps
           for (const dk of DIR_KEYS) {
             const d = DIRS[dk];
             const nnx = n.x + d.x;
@@ -262,10 +264,30 @@ function generateBoard(difficultyKey) {
               emptyNeighborsCount += 1;
             }
           }
-          if (emptyNeighborsCount < minEmptyNeighbors) {
-            minEmptyNeighbors = emptyNeighborsCount;
+
+          // 2. Calculate self-coiling proximity
+          let bodyScore = 0;
+          for (const cell of cells) {
+            const dx = Math.abs(cell.x - n.x);
+            const dy = Math.abs(cell.y - n.y);
+
+            if (dx <= 1 && dy <= 1) {
+              if (dx === 0 && dy === 0) continue;
+              // Orthogonal touch = +5, Diagonal touch = +3
+              bodyScore += (dx + dy === 1) ? 5 : 3;
+            } else if (dx <= 2 && dy <= 2) {
+              // 2-cell radius pull = +1
+              bodyScore += 1;
+            }
+          }
+
+          // 3. Score heavily biases body-hugging over empty-space avoidance
+          const score = bodyScore - emptyNeighborsCount;
+
+          if (score > bestScore) {
+            bestScore = score;
             bestNeighbors = [n];
-          } else if (emptyNeighborsCount === minEmptyNeighbors) {
+          } else if (score === bestScore) {
             bestNeighbors.push(n);
           }
         }
@@ -274,20 +296,22 @@ function generateBoard(difficultyKey) {
             const distA = Math.max(Math.abs(a.x - center), Math.abs(a.y - center));
             const distB = Math.max(Math.abs(b.x - center), Math.abs(b.y - center));
 
-            const jitterA = distA + (Math.random() * 0.5);
-            const jitterB = distB + (Math.random() * 0.5);
+            // 2.0 jitter allows the tail to step outward slightly to complete a coil
+            // before snapping back toward the center.
+            const jitterA = distA + (Math.random() * 2.0);
+            const jitterB = distB + (Math.random() * 2.0);
 
             return jitterA - jitterB;
         });
 
-        const next = bestNeighbors[0];
+        // const next = bestNeighbors[0];
 
-        // const closestDist = Math.max(Math.abs(bestNeighbors[0].x - center), Math.abs(bestNeighbors[0].y - center));
-        // const closestNeighbors = bestNeighbors.filter((n) =>
-        //     Math.max(Math.abs(n.x - center), Math.abs(n.y - center)) === closestDist
-        // );
-        //
-        // const next = closestNeighbors[randInt(closestNeighbors.length)];
+        const closestDist = Math.max(Math.abs(bestNeighbors[0].x - center), Math.abs(bestNeighbors[0].y - center));
+        const closestNeighbors = bestNeighbors.filter((n) =>
+            Math.max(Math.abs(n.x - center), Math.abs(n.y - center)) === closestDist
+        );
+
+        const next = closestNeighbors[randInt(closestNeighbors.length)];
         cells.push(next);
         grid[next.y][next.x] = arrowId;
         emptyCount -= 1;
@@ -390,6 +414,38 @@ function generateBoard(difficultyKey) {
     //   }
     //   if (hasLargeEmpty) break;
     // }
+    // --- POST-PROCESSING: DIFFICULTY CHECK ---
+    // At most half the heads may have a clear firing ray.
+    // Skip if there is only 1 arrow to ensure tiny boards remain possible.
+    if (arrows.size > 1) {
+      let clearRayCount = 0;
+
+      for (const arr of arrows.values()) {
+        const head = arr.cells[0];
+        const dir = DIRS[arr.headDir];
+        let cx = head.x + dir.x;
+        let cy = head.y + dir.y;
+        let isClear = true;
+
+        while (inBounds(cx, cy, size)) {
+          // If we hit any occupied cell (even the arrow's own body), the ray is blocked
+          if (grid[cy][cx] !== null) {
+            isClear = false;
+            break;
+          }
+          cx += dir.x;
+          cy += dir.y;
+        }
+
+        if (isClear) {
+          clearRayCount += 1;
+        }
+      }
+
+      if (clearRayCount > arrows.size / 3) {
+        continue; // Reject this board layout and try again
+      }
+    }
 
     // if (!hasLargeEmpty) {
       return { size, grid, arrows, nextArrowId: arrowId };
