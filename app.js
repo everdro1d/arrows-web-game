@@ -14,10 +14,12 @@ const CONFIG = {
   BLOCKED_FLASH_MS: 340,
   FIRE_SPEED_CELLS_PER_SEC: 10,
   DIFFICULTIES: {
-    easy: { name: 'Easy', size: 8, arrowCount: 10 },
-    medium: { name: 'Medium', size: 12, arrowCount: 35 },
-    hard: { name: 'Hard', size: 20, arrowCount: 55 },
-    superHard: { name: 'Super Hard', size: 40, arrowCount: 185 }
+    simple: { name: 'Simple', size: 6, arrowCount: 8 },
+    easy: { name: 'Easy', size: 10, arrowCount: 20 },
+    medium: { name: 'Medium', size: 15, arrowCount: 50 },
+    hard: { name: 'Hard', size: 35, arrowCount: 140 },
+    superHard: { name: 'Super Hard', size: 60, arrowCount: 355 },
+    legendary: { name: 'Legendary', size: 100, arrowCount: 1200 }
   }
 };
 
