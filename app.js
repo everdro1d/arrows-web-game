@@ -8,16 +8,16 @@ const CONFIG = {
   EMPTY_DOT_RADIUS_RATIO: 0.10,
   ARROW_STROKE_RATIO: 0.20,
   ARROW_HEAD_RATIO: 0.50,
-  RAY_WIDTH_RATIO: 0.05,
+  RAY_WIDTH_RATIO: 0.10,
   COLOR_RAY: '#D0E8F0',
   BLOCKED_SHAKE_MS: 260,
   BLOCKED_FLASH_MS: 340,
   FIRE_SPEED_CELLS_PER_SEC: 10,
   DIFFICULTIES: {
-    easy: { name: 'Easy', size: 6, arrowCount: 8 },
-    medium: { name: 'Medium', size: 10, arrowCount: 20 },
-    hard: { name: 'Hard', size: 15, arrowCount: 45 },
-    superHard: { name: 'Super Hard', size: 35, arrowCount: 145 }
+    easy: { name: 'Easy', size: 8, arrowCount: 10 },
+    medium: { name: 'Medium', size: 12, arrowCount: 35 },
+    hard: { name: 'Hard', size: 20, arrowCount: 55 },
+    superHard: { name: 'Super Hard', size: 40, arrowCount: 185 }
   }
 };
 
@@ -103,203 +103,254 @@ function getCellCenter(cell) {
   return { x: cell.x + 0.5, y: cell.y + 0.5 };
 }
 
-function generateSpanningForestPaths(size, targetCount) {
-  const totalCells = size * size;
-  const parent = new Int32Array(totalCells);
-  const degree = new Uint8Array(totalCells);
+function generateBoard(difficultyKey) {
+  const diff = CONFIG.DIFFICULTIES[difficultyKey];
+  const size = diff.size;
+  const center = (size - 1) / 2;
 
-  for (let i = 0; i < totalCells; i += 1) {
-    parent[i] = i;
-  }
+  for (let attempt = 0; attempt < 5000; attempt += 1) {
+    const grid = createEmptyGrid(size);
+    const arrows = new Map();
+    let arrowId = 1;
+    let emptyCount = size * size;
+    let failed = false;
 
-  function find(i) {
-    let root = i;
-    while (root !== parent[root]) root = parent[root];
-    let curr = i;
-    while (curr !== root) {
-      const nxt = parent[curr];
-      parent[curr] = root;
-      curr = nxt;
-    }
-    return root;
-  }
+    // rayOwners tracks which arrows depend on a cell being clear for their escape ray
+    const rayOwners = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [])
+    );
 
-  const edges = [];
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const u = y * size + x;
-      if (x < size - 1) edges.push([u, u + 1]);
-      if (y < size - 1) edges.push([u, u + size]);
-    }
-  }
-  shuffle(edges);
-
-  let currentPaths = totalCells;
-  const adjacency = Array.from({ length: totalCells }, () => []);
-
-  for (const [u, v] of edges) {
-    if (currentPaths <= targetCount) break;
-    if (degree[u] >= 2 || degree[v] >= 2) continue;
-
-    const rootU = find(u);
-    const rootV = find(v);
-    if (rootU !== rootV) {
-      parent[rootU] = rootV;
-      degree[u] += 1;
-      degree[v] += 1;
-      adjacency[u].push(v);
-      adjacency[v].push(u);
-      currentPaths -= 1;
-    }
-  }
-
-  const visited = new Uint8Array(totalCells);
-  const paths = [];
-  const emptyMask = new Uint8Array(totalCells);
-
-  function hasEmptyNeighbor(x, y) {
-    const neighbors = [
-      { x: x + 1, y },
-      { x: x - 1, y },
-      { x, y: y + 1 },
-      { x, y: y - 1 }
-    ];
-    return neighbors.some(n => {
-      if (n.x >= 0 && n.x < size && n.y >= 0 && n.y < size) {
-        return emptyMask[n.y * size + n.x] === 1;
-      }
-      return false;
-    });
-  }
-
-  for (let i = 0; i < totalCells; i += 1) {
-    if (!visited[i] && degree[i] <= 1) {
-      const path = [];
-      let curr = i;
-      let prev = -1;
-      while (curr !== undefined) {
-        visited[curr] = 1;
-        path.push({ x: curr % size, y: Math.floor(curr / size) });
-        const next = adjacency[curr].find(n => n !== prev);
-        prev = curr;
-        curr = next;
-      }
-
-      if (path.length >= 2) {
-        paths.push(path);
-      } else if (path.length === 1) {
-        const { x, y } = path[0];
-        if (hasEmptyNeighbor(x, y)) {
-          paths.push(path);
-        } else {
-          emptyMask[y * size + x] = 1;
+    while (arrowId <= diff.arrowCount && emptyCount > 0) {
+      const emptyCells = [];
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          if (grid[y][x] === null) {
+            emptyCells.push({ x, y, r: Math.random() });
+          }
         }
       }
-    }
-  }
 
-  return paths;
-}
+      // Sort: Inside-out placement. Center cells placed first prevents ray blockages.
+      emptyCells.sort((a, b) => {
+        const distA = Math.max(Math.abs(a.x - center), Math.abs(a.y - center));
+        const distB = Math.max(Math.abs(b.x - center), Math.abs(b.y - center));
+        if (distA !== distB) return distA - distB;
+        return a.r - b.r;
+      });
 
-function resolveExits(paths, size) {
-  const currentPaths = paths.map((p, i) => ({ id: i + 1, cells: [...p] }));
-  const grid = createEmptyGrid(size);
-  for (const p of currentPaths) {
-    for (const c of p.cells) {
-      grid[c.y][c.x] = p.id;
-    }
-  }
-
-  const removed = [];
-  while (currentPaths.length > 0) {
-    let found = false;
-    for (let i = 0; i < currentPaths.length; i += 1) {
-      const p = currentPaths[i];
-      if (p.cells.length < 2) return null;
-
-      const endpoints = [p.cells[0], p.cells[p.cells.length - 1]];
-      shuffle(endpoints);
-      const dirs = shuffle([...DIR_KEYS]);
-
-      for (const head of endpoints) {
-        const body1 = head === p.cells[0] ? p.cells[1] : p.cells[p.cells.length - 2];
+      let placement = null;
+      for (const head of emptyCells) {
+        const dirs = shuffle([...DIR_KEYS]);
 
         for (const dirKey of dirs) {
           const dir = DIRS[dirKey];
+          const body1x = head.x - dir.x;
+          const body1y = head.y - dir.y;
 
-          if (body1.x !== head.x - dir.x || body1.y !== head.y - dir.y) {
+          // Constraint 1: Arrow head must have one cell directly behind it
+          if (!inBounds(body1x, body1y, size) || grid[body1y][body1x] !== null) {
             continue;
           }
 
           let cx = head.x + dir.x;
           let cy = head.y + dir.y;
           let clear = true;
+          const rayCells = [];
 
           while (inBounds(cx, cy, size)) {
             if (grid[cy][cx] !== null) {
               clear = false;
               break;
             }
+            rayCells.push({ x: cx, y: cy });
             cx += dir.x;
             cy += dir.y;
           }
 
           if (clear) {
-            if (head === p.cells[p.cells.length - 1]) {
-              p.cells.reverse();
-            }
-            p.headDir = dirKey;
-            removed.push(p);
-            for (const c of p.cells) {
-              grid[c.y][c.x] = null;
-            }
-            currentPaths.splice(i, 1);
-            found = true;
+            placement = { head, dirKey, dir, body1: { x: body1x, y: body1y }, rayCells };
             break;
           }
         }
-        if (found) break;
+        if (placement) break;
       }
-      if (found) break;
+
+      if (!placement) {
+        failed = true;
+        break;
+      }
+
+      const cells = [placement.head, placement.body1];
+      grid[placement.head.y][placement.head.x] = arrowId;
+      grid[placement.body1.y][placement.body1.x] = arrowId;
+      emptyCount -= 2;
+
+      // Mark the ray cells for safe tail extension later
+      for (const rc of placement.rayCells) {
+        rayOwners[rc.y][rc.x].push(arrowId);
+      }
+
+      const raySet = new Set(placement.rayCells.map(c => `${c.x},${c.y}`));
+      const arrowsLeft = diff.arrowCount - arrowId + 1;
+      let targetLength = Math.ceil(emptyCount / arrowsLeft) + 1;
+
+      let curr = placement.body1;
+      while (cells.length < targetLength) {
+        const neighbors = [];
+        for (const dk of DIR_KEYS) {
+          const d = DIRS[dk];
+          const nx = curr.x + d.x;
+          const ny = curr.y + d.y;
+          // Constraint 2: Arrow cannot face into its own body
+          if (inBounds(nx, ny, size) && grid[ny][nx] === null && !raySet.has(`${nx},${ny}`)) {
+            neighbors.push({ x: nx, y: ny });
+          }
+        }
+
+        if (neighbors.length === 0) break;
+
+        let bestNeighbors = [];
+        let minEmptyNeighbors = 999;
+
+        for (const n of neighbors) {
+          let emptyNeighborsCount = 0;
+          for (const dk of DIR_KEYS) {
+            const d = DIRS[dk];
+            const nnx = n.x + d.x;
+            const nny = n.y + d.y;
+            if (inBounds(nnx, nny, size) && grid[nny][nnx] === null && !raySet.has(`${nnx},${nny}`)) {
+              emptyNeighborsCount += 1;
+            }
+          }
+          if (emptyNeighborsCount < minEmptyNeighbors) {
+            minEmptyNeighbors = emptyNeighborsCount;
+            bestNeighbors = [n];
+          } else if (emptyNeighborsCount === minEmptyNeighbors) {
+            bestNeighbors.push(n);
+          }
+        }
+
+        bestNeighbors.sort((a, b) => {
+            const distA = Math.max(Math.abs(a.x - center), Math.abs(a.y - center));
+            const distB = Math.max(Math.abs(b.x - center), Math.abs(b.y - center));
+            return distA - distB;
+        });
+
+        const closestDist = Math.max(Math.abs(bestNeighbors[0].x - center), Math.abs(bestNeighbors[0].y - center));
+        const closestNeighbors = bestNeighbors.filter((n) =>
+            Math.max(Math.abs(n.x - center), Math.abs(n.y - center)) === closestDist
+        );
+
+        const next = closestNeighbors[randInt(closestNeighbors.length)];
+        cells.push(next);
+        grid[next.y][next.x] = arrowId;
+        emptyCount -= 1;
+        curr = next;
+      }
+
+      arrows.set(arrowId, {
+        id: arrowId,
+        headDir: placement.dirKey,
+        cells,
+        blockedUntil: 0,
+        shakeUntil: 0,
+        queued: false,
+        firing: false
+      });
+
+      arrowId += 1;
     }
-    if (!found) return null;
-  }
 
-  const arrowMap = new Map();
-  for (const p of removed) {
-    arrowMap.set(p.id, {
-      id: p.id,
-      headDir: p.headDir,
-      cells: p.cells,
-      blockedUntil: 0,
-      shakeUntil: 0,
-      queued: false,
-      firing: false
-    });
-  }
-  return arrowMap;
-}
+    if (failed || arrowId <= diff.arrowCount) {
+      continue;
+    }
 
-function generateBoard(difficultyKey) {
-  const diff = CONFIG.DIFFICULTIES[difficultyKey];
-  const size = diff.size;
+    // --- POST-PROCESSING: SAFE TAIL EXTENSION ---
+    // Iterate over the grid, vacuuming up isolated empty spaces by stretching arrow tails into them.
+    let changed = true;
+    while (changed) {
+      changed = false;
 
-  for (let attempt = 0; attempt < 5000; attempt += 1) {
-    const paths = generateSpanningForestPaths(size, diff.arrowCount);
-    const arrows = resolveExits(paths, size);
+      const currentEmpty = [];
+      for (let y = 0; y < size; y += 1) {
+          for (let x = 0; x < size; x += 1) {
+              if (grid[y][x] === null) currentEmpty.push({ x, y, r: Math.random() });
+          }
+      }
 
-    if (arrows) {
-      const grid = createEmptyGrid(size);
-      for (const arrow of arrows.values()) {
-        for (const cell of arrow.cells) {
-          grid[cell.y][cell.x] = arrow.id;
+      currentEmpty.sort((a, b) => {
+          const distA = Math.max(Math.abs(a.x - center), Math.abs(a.y - center));
+          const distB = Math.max(Math.abs(b.x - center), Math.abs(b.y - center));
+          if (distA !== distB) return distA - distB;
+          return a.r - b.r;
+      });
+
+      for (const E of currentEmpty) {
+        if (grid[E.y][E.x] !== null) continue;
+
+        const adjacentArrows = [];
+        for (const dk of DIR_KEYS) {
+          const d = DIRS[dk];
+          const nx = E.x + d.x;
+          const ny = E.y + d.y;
+          if (inBounds(nx, ny, size) && grid[ny][nx] !== null) {
+            const aId = grid[ny][nx];
+            const arr = arrows.get(aId);
+            const tail = arr.cells[arr.cells.length - 1];
+            if (tail.x === nx && tail.y === ny) {
+              adjacentArrows.push(arr);
+            }
+          }
+        }
+
+        shuffle(adjacentArrows);
+
+        for (const arr of adjacentArrows) {
+          const k = arr.id;
+          // To prevent creating a cyclic deadlock, we can only grow arrow "k" into this cell
+          // if the cell does not block the ray of any arrow generated AFTER "k".
+          const isSafe = !rayOwners[E.y][E.x].some(id => id >= k);
+
+          if (isSafe) {
+            arr.cells.push({ x: E.x, y: E.y });
+            grid[E.y][E.x] = k;
+            changed = true;
+            break;
+          }
         }
       }
-      return { size, grid, arrows, nextArrowId: diff.arrowCount + 1 };
     }
+
+    // Reject the board if any two empty cells remain orthogonally adjacent
+    // Commented out due to high scaling multipliers on large board load times
+    // let hasLargeEmpty = false;
+    // for (let y = 0; y < size; y += 1) {
+    //   for (let x = 0; x < size; x += 1) {
+    //     if (grid[y][x] === null) {
+    //       const neighbors = [
+    //         { x: x + 1, y },
+    //         { x: x - 1, y },
+    //         { x, y: y + 1 },
+    //         { x, y: y - 1 }
+    //       ];
+    //       for (const n of neighbors) {
+    //         if (inBounds(n.x, n.y, size) && grid[n.y][n.x] === null) {
+    //           hasLargeEmpty = true;
+    //           break;
+    //         }
+    //       }
+    //     }
+    //     if (hasLargeEmpty) break;
+    //   }
+    //   if (hasLargeEmpty) break;
+    // }
+
+    // if (!hasLargeEmpty) {
+      return { size, grid, arrows, nextArrowId: arrowId };
+    // }
   }
 
-  throw new Error('Failed to generate a solvable board.');
+  throw new Error('Failed to generate a solvable board matching all constraints.');
 }
 
 function resetView() {
