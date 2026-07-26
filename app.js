@@ -284,7 +284,9 @@ function generateBoard(difficultyKey) {
               bodyScore += (dx + dy === 1) ? 5 : 3;
             } else if (dx <= 2 && dy <= 2) {
               // 2-cell radius pull = +1
-              bodyScore += 1;
+              bodyScore += 6;
+            } else if (dx <= 5 && dy <= 5) {
+              bodyScore += 4;
             }
           }
 
