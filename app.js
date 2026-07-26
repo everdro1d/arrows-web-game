@@ -290,8 +290,21 @@ function generateBoard(difficultyKey) {
             }
           }
 
-          // 3. Score heavily biases body-hugging over empty-space avoidance
-          const score = bodyScore - emptyNeighborsCount;
+          const edgeDist = Math.min(
+            n.x,
+            n.y,
+            size - 1 - n.x,
+            size - 1 - n.y
+          );
+
+          let edgePenalty = 0;
+
+          if (edgeDist === 0) edgePenalty = 20;
+          else if (edgeDist === 1) edgePenalty = 10;
+          else if (edgeDist === 2) edgePenalty = 5;
+          else if (edgeDist === 3) edgePenalty = 2;
+
+          const score = bodyScore - emptyNeighborsCount - edgePenalty;
 
           if (score > bestScore) {
             bestScore = score;
