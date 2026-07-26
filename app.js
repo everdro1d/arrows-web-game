@@ -435,6 +435,55 @@ function generateBoard(difficultyKey) {
     //   }
     //   if (hasLargeEmpty) break;
     // }
+
+    // --- POST-PROCESSING: MERGE ADJACENT 2-CELL ARROWS ---
+    for (const arr of [...arrows.values()]) {
+      if (!arrows.has(arr.id)) continue;
+      if (arr.cells.length !== 2) continue;
+
+      const dir = DIRS[arr.headDir];
+
+      // Cell directly behind this arrow's tail
+      const tail = arr.cells[1];
+      const bx = tail.x - dir.x;
+      const by = tail.y - dir.y;
+
+      if (!inBounds(bx, by, size)) continue;
+
+      const otherId = grid[by][bx];
+      if (otherId == null || otherId === arr.id) continue;
+
+      const other = arrows.get(otherId);
+      if (!other) continue;
+
+      // Must also be a 2-cell arrow facing the same direction
+      if (other.headDir !== arr.headDir) continue;
+      if (other.cells.length !== 2) continue;
+
+      // Ensure we're touching its head
+      if (
+        other.cells[0].x !== bx ||
+        other.cells[0].y !== by
+      ) {
+        continue;
+      }
+
+      // Merge:
+      // arr:   H T
+      // other: H T
+      //
+      // result:
+      // H T H T
+
+      arr.cells.push(...other.cells);
+
+      for (const cell of other.cells) {
+        grid[cell.y][cell.x] = arr.id;
+      }
+
+      arrows.delete(other.id);
+    }
+
     // --- POST-PROCESSING: DIFFICULTY CHECK ---
     // At most half the heads may have a clear firing ray.
     // Skip if there is only 1 arrow to ensure tiny boards remain possible.
