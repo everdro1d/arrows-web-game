@@ -17,7 +17,7 @@ const CONFIG = {
     easy: { name: 'Easy', size: 6, arrowCount: 8 },
     medium: { name: 'Medium', size: 10, arrowCount: 20 },
     hard: { name: 'Hard', size: 15, arrowCount: 45 },
-    superHard: { name: 'Super Hard', size: 25, arrowCount: 120 }
+    superHard: { name: 'Super Hard', size: 35, arrowCount: 145 }
   }
 };
 
@@ -155,6 +155,23 @@ function generateSpanningForestPaths(size, targetCount) {
 
   const visited = new Uint8Array(totalCells);
   const paths = [];
+  const emptyMask = new Uint8Array(totalCells);
+
+  function hasEmptyNeighbor(x, y) {
+    const neighbors = [
+      { x: x + 1, y },
+      { x: x - 1, y },
+      { x, y: y + 1 },
+      { x, y: y - 1 }
+    ];
+    return neighbors.some(n => {
+      if (n.x >= 0 && n.x < size && n.y >= 0 && n.y < size) {
+        return emptyMask[n.y * size + n.x] === 1;
+      }
+      return false;
+    });
+  }
+
   for (let i = 0; i < totalCells; i += 1) {
     if (!visited[i] && degree[i] <= 1) {
       const path = [];
@@ -167,7 +184,17 @@ function generateSpanningForestPaths(size, targetCount) {
         prev = curr;
         curr = next;
       }
-      paths.push(path);
+
+      if (path.length >= 2) {
+        paths.push(path);
+      } else if (path.length === 1) {
+        const { x, y } = path[0];
+        if (hasEmptyNeighbor(x, y)) {
+          paths.push(path);
+        } else {
+          emptyMask[y * size + x] = 1;
+        }
+      }
     }
   }
 
@@ -188,24 +215,22 @@ function resolveExits(paths, size) {
     let found = false;
     for (let i = 0; i < currentPaths.length; i += 1) {
       const p = currentPaths[i];
-      const endpoints = p.cells.length > 1 ? [p.cells[0], p.cells[p.cells.length - 1]] : [p.cells[0]];
+      if (p.cells.length < 2) return null;
+
+      const endpoints = [p.cells[0], p.cells[p.cells.length - 1]];
       shuffle(endpoints);
       const dirs = shuffle([...DIR_KEYS]);
 
       for (const head of endpoints) {
-        const body1 = p.cells.length > 1
-          ? (head === p.cells[0] ? p.cells[1] : p.cells[p.cells.length - 2])
-          : null;
+        const body1 = head === p.cells[0] ? p.cells[1] : p.cells[p.cells.length - 2];
 
         for (const dirKey of dirs) {
           const dir = DIRS[dirKey];
 
-          // Ensure the first body cell is directly behind the head
-          if (body1 && (body1.x !== head.x - dir.x || body1.y !== head.y - dir.y)) {
+          if (body1.x !== head.x - dir.x || body1.y !== head.y - dir.y) {
             continue;
           }
 
-          // Ensure the exit ray is completely unobstructed by any cell (including own body)
           let cx = head.x + dir.x;
           let cy = head.y + dir.y;
           let clear = true;
@@ -325,6 +350,10 @@ function loadBoard(board) {
 function startGame(difficultyKey) {
   state.difficultyKey = difficultyKey;
   const board = generateBoard(difficultyKey);
+
+  // Create a mask of cells where arrows were actually generated
+  state.activeMask = board.grid.map((row) => row.map((cell) => cell !== null));
+
   state.initialBoard = {
     size: board.size,
     grid: board.grid.map((row) => [...row]),
@@ -631,11 +660,16 @@ function drawRays(now) {
 }
 
 function drawGridDots() {
+  if (!state.activeMask) return;
+
   const radius = CONFIG.CELL_SIZE * CONFIG.EMPTY_DOT_RADIUS_RATIO * state.view.scale;
   ctx.fillStyle = CONFIG.COLOR_EMPTY_DOT;
+
   for (let y = 0; y < state.gridSize; y += 1) {
     for (let x = 0; x < state.gridSize; x += 1) {
-      if (state.grid[y][x]) continue;
+      // Draw dots only for cells that had generated arrows
+      if (!state.activeMask[y][x]) continue;
+
       const c = worldToScreen({ x: x + 0.5, y: y + 0.5 });
       ctx.beginPath();
       ctx.arc(c.x, c.y, radius, 0, Math.PI * 2);
