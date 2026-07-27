@@ -1,2 +1,2 @@
 # arrows-web-game
-A web game of a sequential arrow unblocking game.
+A HTML5 & js game - sequential arrow unblocking.
