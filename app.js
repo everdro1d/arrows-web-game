@@ -1,15 +1,17 @@
 const CONFIG = {
-  COLOR_BACKGROUND: '#FFFFFF',
-  COLOR_ARROW_DEFAULT: '#000000',
-  COLOR_ARROW_ACTIVE: '#0000FF',
-  COLOR_ARROW_BLOCKED: '#FF0000',
-  COLOR_EMPTY_DOT: '#CCCCCC',
+  // Theme-aware colors
+  get COLOR_BACKGROUND() { return document.body.classList.contains('dark-theme') ? '#121212' : '#FFFFFF'; },
+  get COLOR_ARROW_DEFAULT() { return document.body.classList.contains('dark-theme') ? '#FFFFFF' : '#000000'; },
+  get COLOR_ARROW_ACTIVE() { return '#0000FF'; },
+  get COLOR_ARROW_BLOCKED() { return '#FF0000'; },
+  get COLOR_EMPTY_DOT() { return document.body.classList.contains('dark-theme') ? '#444444' : '#CCCCCC'; },
+  get COLOR_RAY() { return document.body.classList.contains('dark-theme') ? '#204050' : '#D0E8F0'; },
+
   CELL_SIZE: 50,
   EMPTY_DOT_RADIUS_RATIO: 0.10,
   ARROW_STROKE_RATIO: 0.20,
   ARROW_HEAD_RATIO: 0.50,
   RAY_WIDTH_RATIO: 0.10,
-  COLOR_RAY: '#D0E8F0',
   BLOCKED_SHAKE_MS: 260,
   BLOCKED_FLASH_MS: 340,
   FIRE_SPEED_CELLS_PER_SEC: 15,
@@ -34,6 +36,7 @@ const DIR_KEYS = Object.keys(DIRS);
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 const raysToggle = document.getElementById('rays-toggle');
+const themeToggle = document.getElementById('theme-toggle');
 const menuButton = document.getElementById('menu-button');
 const menuModal = document.getElementById('menu-modal');
 const difficultyModal = document.getElementById('difficulty-modal');
@@ -46,6 +49,22 @@ const mainMenuButton = document.getElementById('main-menu');
 const winTitle = document.getElementById('win-title');
 const winTime = document.getElementById('win-time');
 const winCount = document.getElementById('win-count');
+
+// --- Theme Management ---
+function applyTheme(isDark) {
+  document.body.classList.toggle('dark-theme', isDark);
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  themeToggle.textContent = `Dark Mode: ${isDark ? 'On' : 'Off'}`;
+}
+
+const savedTheme = localStorage.getItem('theme');
+const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+applyTheme(savedTheme === 'dark' || (!savedTheme && systemPrefersDark));
+
+themeToggle.addEventListener('click', () => {
+  applyTheme(!document.body.classList.contains('dark-theme'));
+});
+// ------------------------
 
 const state = {
   difficultyKey: null,
